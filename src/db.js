@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://divyashree:271225@cluster0.uqoiqih.mongodb.net/?appName=Cluster0';
+const MONGO_URI =
+  process.env.MONGO_URI || 'mongodb://localhost:27017/smart_college_events';
 
 async function connectDb() {
   try {
@@ -14,6 +15,5 @@ async function connectDb() {
     throw err;
   }
 }
-
 
 module.exports = connectDb;
