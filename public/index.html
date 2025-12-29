@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Smart College Event Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+      header { background: #1f2937; color: white; padding: 1rem; text-align: center; }
+      main { max-width: 960px; margin: 2rem auto; background: white; padding: 2rem; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+      .role-card { border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; }
+      button { background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; cursor: pointer; }
+      button:hover { background: #1d4ed8; }
+      input, select { padding: 0.4rem; margin: 0.2rem 0; width: 100%; max-width: 320px; }
+      .hidden { display: none; }
+      .flex { display: flex; gap: 1rem; flex-wrap: wrap; }
+      .card { border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1rem; margin: 0.5rem 0; }
+      .badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 9999px; font-size: 0.75rem; background: #e5e7eb; margin-right: 0.25rem; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Smart College Event Tracker</h1>
+      <p>Academic events, QR attendance, certificates, and analytics for your college</p>
+    </header>
+    <main>
+      <section id="auth-section">
+        <h2>Login / Quick Demo</h2>
+        <p>For a quick demo, register once as a student and once as faculty, then log in below.</p>
+        <div class="flex">
+          <div class="role-card">
+            <h3>Register</h3>
+            <label>Name <input id="reg-name" /></label>
+            <label>Email <input id="reg-email" /></label>
+            <label>Password <input id="reg-password" type="password" /></label>
+            <label>Role
+              <select id="reg-role">
+                <option value="student">Student</option>
+                <option value="faculty">Faculty</option>
+                <option value="hod">HOD</option>
+              </select>
+            </label>
+            <label>Department <input id="reg-dept" placeholder="CSE / ECE / MECH" /></label>
+            <label>Semester (for students) <input id="reg-sem" type="number" min="1" max="12" /></label>
+            <label>Roll No (for students) <input id="reg-roll" /></label>
+            <button id="reg-btn">Register</button>
+            <div id="reg-msg"></div>
+          </div>
+          <div class="role-card">
+            <h3>Login</h3>
+            <label>Email <input id="login-email" /></label>
+            <label>Password <input id="login-password" type="password" /></label>
+            <button id="login-btn">Login</button>
+            <div id="login-msg"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="student-dashboard" class="hidden">
+        <h2>Student Dashboard</h2>
+        <p id="student-info"></p>
+        <h3>Relevant Upcoming Events</h3>
+        <div id="student-events"></div>
+        <h3>My QR for Selected Event</h3>
+        <p>Select an event below to get your QR payload for attendance. This string can be encoded as a QR code using any QR generator app.</p>
+        <select id="qr-event-select"></select>
+        <button id="qr-load-btn">Get QR Payload</button>
+        <pre id="qr-payload-box"></pre>
+        <h3>Notifications</h3>
+        <div id="student-notifications"></div>
+        <h3>My Certificates</h3>
+        <div id="student-certificates"></div>
+        <h3>Academic Calendar</h3>
+        <div id="calendar"></div>
+      </section>
+
+      <section id="faculty-dashboard" class="hidden">
+        <h2>Faculty / HOD Dashboard</h2>
+        <p id="faculty-info"></p>
+        <h3>Create Academic Event</h3>
+        <div class="card">
+          <label>Title <input id="ev-title" /></label>
+          <label>Description <input id="ev-desc" /></label>
+          <label>Department <input id="ev-dept" /></label>
+          <label>Type
+            <select id="ev-type">
+              <option value="seminar">Seminar</option>
+              <option value="workshop">Workshop</option>
+              <option value="circular">Circular</option>
+              <option value="internal">Internal Event</option>
+              <option value="deadline">Deadline</option>
+              <option value="exam">Exam</option>
+            </select>
+          </label>
+          <label>Start time <input id="ev-start" type="datetime-local" /></label>
+          <label>End time <input id="ev-end" type="datetime-local" /></label>
+          <label>Location <input id="ev-location" /></label>
+          <button id="ev-create-btn">Create Event</button>
+          <div id="ev-create-msg"></div>
+        </div>
+
+        <h3>Upcoming Events (with Clash Info)</h3>
+        <div id="faculty-events"></div>
+
+        <h3>QR Attendance Scanner (Demo)</h3>
+        <p>Paste a QR payload scanned from a student's code to mark attendance.</p>
+        <textarea id="scan-payload" rows="3" style="width:100%;"></textarea>
+        <button id="scan-btn">Mark Attendance</button>
+        <div id="scan-msg"></div>
+
+        <h3>Attendance Metadata (Internal Marks / NSS / Club)</h3>
+        <div class="card">
+          <label>Event
+            <select id="att-event-select"></select>
+          </label>
+          <button id="att-load-btn">Load Attendance</button>
+          <div id="att-msg"></div>
+          <div id="att-list"></div>
+        </div>
+
+        <h3>Basic Participation Analytics</h3>
+        <button id="analytics-btn">Load This Year Analytics</button>
+        <pre id="analytics-box"></pre>
+        <button id="export-btn">Download Annual Report CSV</button>
+      </section>
+    </main>
+    <script>
+      const API_BASE = '/api';
+      let authToken = null;
+      let currentUser = null;
+
+      function setAuth(token, user) {
+        authToken = token;
+        currentUser = user;
+        document.getElementById('auth-section').classList.add('hidden');
+        if (user.role === 'student') {
+          document.getElementById('student-dashboard').classList.remove('hidden');
+          document.getElementById('faculty-dashboard').classList.add('hidden');
+          document.getElementById('student-info').innerText = `${user.name} (${user.department}, Sem ${user.semester})`;
+          loadStudentData();
+        } else {
+          document.getElementById('faculty-dashboard').classList.remove('hidden');
+          document.getElementById('student-dashboard').classList.add('hidden');
+          document.getElementById('faculty-info').innerText = `${user.name} (${user.role.toUpperCase()} - ${user.department})`;
+
+          // Stronger role separation in UI: hide exam/deadline creation for faculty
+          const evTypeSelect = document.getElementById('ev-type');
+          if (user.role === 'faculty' && evTypeSelect) {
+            Array.from(evTypeSelect.options).forEach((opt) => {
+              if (opt.value === 'exam' || opt.value === 'deadline') {
+                opt.disabled = true;
+              }
+            });
+          }
+
+          // Restrict analytics/export buttons to HOD/Admin
+          const analyticsBtn = document.getElementById('analytics-btn');
+          const exportBtn = document.getElementById('export-btn');
+          const canSeeAnalytics = user.role === 'hod' || user.role === 'admin';
+          if (analyticsBtn) analyticsBtn.style.display = canSeeAnalytics ? 'inline-block' : 'none';
+          if (exportBtn) exportBtn.style.display = canSeeAnalytics ? 'inline-block' : 'none';
+
+          loadFacultyData();
+        }
+      }
+
+      async function api(path, options = {}) {
+        const headers = options.headers || {};
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+        headers['Content-Type'] = 'application/json';
+        const res = await fetch(API_BASE + path, { ...options, headers });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Request failed');
+        }
+        const text = await res.text();
+        return text ? JSON.parse(text) : {};
+      }
+
+      document.getElementById('reg-btn').onclick = async () => {
+        const name = document.getElementById('reg-name').value;
+        const email = document.getElementById('reg-email').value;
+        const password = document.getElementById('reg-password').value;
+        const role = document.getElementById('reg-role').value;
+        const department = document.getElementById('reg-dept').value;
+        const semester = parseInt(document.getElementById('reg-sem').value || '0', 10) || undefined;
+        const rollNumber = document.getElementById('reg-roll').value;
+        const msg = document.getElementById('reg-msg');
+        msg.innerText = '';
+        try {
+          const data = await api('/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({ name, email, password, role, department, semester, rollNumber }),
+          });
+          msg.innerText = 'Registered & logged in as ' + data.user.role;
+          setAuth(data.token, data.user);
+        } catch (e) {
+          msg.innerText = e.message;
+        }
+      };
+
+      document.getElementById('login-btn').onclick = async () => {
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const msg = document.getElementById('login-msg');
+        msg.innerText = '';
+        try {
+          const data = await api('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password }),
+          });
+          msg.innerText = 'Logged in as ' + data.user.role;
+          setAuth(data.token, data.user);
+        } catch (e) {
+          msg.innerText = e.message;
+        }
+      };
+
+      async function loadStudentData() {
+        try {
+          const evData = await api('/events/student/me/relevant');
+          const list = document.getElementById('student-events');
+          const select = document.getElementById('qr-event-select');
+          list.innerHTML = '';
+          select.innerHTML = '';
+          evData.events.forEach((ev) => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.innerHTML = `<strong>${ev.title}</strong> <span class=\"badge\">${ev.type}</span><br/>${new Date(ev.startTime).toLocaleString()} @ ${ev.location || 'TBA'}`;
+            list.appendChild(div);
+            const opt = document.createElement('option');
+            opt.value = ev._id;
+            opt.textContent = ev.title;
+            select.appendChild(opt);
+          });
+
+          const notifData = await api('/notifications/me');
+          const nlist = document.getElementById('student-notifications');
+          nlist.innerHTML = '';
+          notifData.notifications.forEach((n) => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.innerHTML = `<strong>${n.title}</strong><br/>${n.body || ''}`;
+            nlist.appendChild(div);
+          });
+
+          // Load certificates for the current student
+          const certData = await api('/certificates/mine');
+          const certList = document.getElementById('student-certificates');
+          certList.innerHTML = '';
+          certData.certificates.forEach((c) => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            const ev = c.event;
+            const date = ev && ev.startTime ? new Date(ev.startTime).toLocaleDateString() : '';
+            div.innerHTML = `<strong>${ev ? ev.title : 'Event'}</strong><br/>Date: ${date}<br/>Certificate ID: ${c.certificateId}<br/><a href=\"${API_BASE}/certificates/${c.certificateId}/download\" target=\"_blank\">Download PDF</a>`;
+            certList.appendChild(div);
+          });
+
+          const calData = await api('/calendar');
+          const calDiv = document.getElementById('calendar');
+          calDiv.innerHTML = '';
+          Object.keys(calData.calendar).forEach((date) => {
+            const dayDiv = document.createElement('div');
+            dayDiv.className = 'card';
+            dayDiv.innerHTML = `<strong>${date}</strong>`;
+            calData.calendar[date].forEach((ev) => {
+              const p = document.createElement('p');
+              p.textContent = `${ev.title} (${ev.department})`;
+              dayDiv.appendChild(p);
+            });
+            calDiv.appendChild(dayDiv);
+          });
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      document.getElementById('qr-load-btn').onclick = async () => {
+        const select = document.getElementById('qr-event-select');
+        const box = document.getElementById('qr-payload-box');
+        box.textContent = '';
+        if (!select.value) return;
+        try {
+          const data = await api(`/events/${select.value}/qr-payload`);
+          box.textContent = data.payload + '\n\nUse any QR generator app to encode this string as a QR code.';
+        } catch (e) {
+          box.textContent = e.message;
+        }
+      };
+
+      async function loadFacultyData() {
+        try {
+          const data = await api('/events?department=' + encodeURIComponent(currentUser.department || ''));
+          const list = document.getElementById('faculty-events');
+          const attSelect = document.getElementById('att-event-select');
+          list.innerHTML = '';
+          if (attSelect) attSelect.innerHTML = '';
+
+          data.events.forEach((ev) => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.innerHTML = `<strong>${ev.title}</strong> <span class="badge">${ev.type}</span><br/>${new Date(ev.startTime).toLocaleString()} - ${new Date(ev.endTime).toLocaleString()}<br/>${ev.location || 'TBA'}`;
+            list.appendChild(div);
+
+            // Populate attendance event dropdown
+            if (attSelect) {
+              const opt = document.createElement('option');
+              opt.value = ev._id;
+              opt.textContent = ev.title;
+              attSelect.appendChild(opt);
+            }
+          });
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      document.getElementById('ev-create-btn').onclick = async () => {
+        const title = document.getElementById('ev-title').value;
+        const description = document.getElementById('ev-desc').value;
+        const department = document.getElementById('ev-dept').value || (currentUser && currentUser.department);
+        const type = document.getElementById('ev-type').value;
+        const startTime = document.getElementById('ev-start').value;
+        const endTime = document.getElementById('ev-end').value;
+        const location = document.getElementById('ev-location').value;
+        const msg = document.getElementById('ev-create-msg');
+        msg.innerText = '';
+        try {
+          const data = await api('/events', {
+            method: 'POST',
+            body: JSON.stringify({ title, description, department, type, startTime, endTime, location }),
+          });
+
+          let text = 'Event created.';
+          if (data.clashes && data.clashes.length) {
+            const details = data.clashes
+              .map((c) => {
+                const s = new Date(c.startTime).toLocaleString();
+                const e = new Date(c.endTime).toLocaleString();
+                return `${c.title} (${s} - ${e})`;
+              })
+              .join('; ');
+            text += ` ${data.clashes.length} clash(es): ${details}`;
+          } else {
+            text += ' No clashes detected.';
+          }
+          msg.innerText = text;
+
+          loadFacultyData();
+          loadStudentData();
+        } catch (e) {
+          msg.innerText = e.message;
+        }
+      };
+
+      document.getElementById('scan-btn').onclick = async () => {
+        const payload = document.getElementById('scan-payload').value.trim();
+        const msg = document.getElementById('scan-msg');
+        msg.innerText = '';
+        if (!payload) return;
+        try {
+          await api('/attendance/mark-from-qr', {
+            method: 'POST',
+            body: JSON.stringify({ payload }),
+          });
+          msg.innerText = 'Attendance marked successfully.';
+        } catch (e) {
+          msg.innerText = e.message;
+        }
+      };
+
+      // Load attendance for selected event and allow editing metadata
+      const attLoadBtn = document.getElementById('att-load-btn');
+      if (attLoadBtn) {
+        attLoadBtn.onclick = async () => {
+          const select = document.getElementById('att-event-select');
+          const list = document.getElementById('att-list');
+          const msg = document.getElementById('att-msg');
+          msg.innerText = '';
+          list.innerHTML = '';
+          if (!select || !select.value) {
+            msg.innerText = 'Please select an event.';
+            return;
+          }
+          try {
+            const data = await api(`/attendance/event/${select.value}`);
+            if (!data.attendance || !data.attendance.length) {
+              msg.innerText = 'No attendance records yet for this event.';
+              return;
+            }
+
+            data.attendance.forEach((rec) => {
+              const div = document.createElement('div');
+              div.className = 'card';
+              div.innerHTML = `
+                <strong>${rec.student.name}</strong> (${rec.student.rollNumber || ''})<br/>
+                Dept: ${rec.student.department || ''}, Sem ${rec.student.semester || ''}<br/>
+                <label>Hours <input type="number" min="0" step="0.5" value="${rec.hours || 0}" data-field="hours" /></label>
+                <label>Category
+                  <select data-field="category">
+                    <option value="academic" ${rec.category === 'academic' ? 'selected' : ''}>Academic</option>
+                    <option value="nss" ${rec.category === 'nss' ? 'selected' : ''}>NSS</option>
+                    <option value="club" ${rec.category === 'club' ? 'selected' : ''}>Club</option>
+                    <option value="other" ${rec.category === 'other' ? 'selected' : ''}>Other</option>
+                  </select>
+                </label>
+                <label>Internal Marks Weight <input type="number" min="0" step="1" value="${rec.internalMarksWeight || 0}" data-field="internalMarksWeight" /></label>
+                <button data-id="${rec._id}" class="att-save-btn">Save</button>
+              `;
+              list.appendChild(div);
+            });
+
+            // Attach click handlers for save buttons
+            list.querySelectorAll('.att-save-btn').forEach((btn) => {
+              btn.onclick = async () => {
+                const card = btn.parentElement;
+                const id = btn.getAttribute('data-id');
+                const hoursInput = card.querySelector('input[data-field="hours"]');
+                const catSelect = card.querySelector('select[data-field="category"]');
+                const weightInput = card.querySelector('input[data-field="internalMarksWeight"]');
+                const payload = {
+                  hours: parseFloat(hoursInput.value || '0'),
+                  category: catSelect.value,
+                  internalMarksWeight: parseFloat(weightInput.value || '0'),
+                };
+                try {
+                  await api(`/attendance/${id}/meta`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload),
+                  });
+                  msg.innerText = 'Attendance metadata saved.';
+                } catch (e) {
+                  msg.innerText = e.message;
+                }
+              };
+            });
+          } catch (e) {
+            msg.innerText = e.message;
+          }
+        };
+      }
+
+      document.getElementById('analytics-btn').onclick = async () => {
+        const box = document.getElementById('analytics-box');
+        box.textContent = '';
+        try {
+          const data = await api('/analytics/overview');
+          box.textContent = JSON.stringify(data, null, 2);
+        } catch (e) {
+          box.textContent = e.message;
+        }
+      };
+
+      document.getElementById('export-btn').onclick = () => {
+        if (!authToken) return;
+        const link = document.createElement('a');
+        link.href = API_BASE + '/analytics/export';
+        link.target = '_blank';
+        link.click();
+      };
+    </script>
+  </body>
+</html>
