@@ -1,0 +1,23 @@
+{
+  "name": "smart-college-event-tracker",
+  "version": "1.0.0",
+  "description": "Smart College Event Tracker - academic event management with QR attendance and certificates",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "keywords": ["college", "events", "attendance", "qr", "certificates"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.19.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.6.0",
+    "morgan": "^1.10.0",
+    "pdfkit": "^0.15.0",
+    "json2csv": "^6.0.0"
+  }
+}
