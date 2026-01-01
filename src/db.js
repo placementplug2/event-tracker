@@ -9,7 +9,7 @@ async function connectDb() {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    console.log('Connected to MongoDB');
+    
   } catch (err) {
     console.error('MongoDB connection error:', err);
     throw err;
@@ -17,3 +17,4 @@ async function connectDb() {
 }
 
 module.exports = connectDb;
+
